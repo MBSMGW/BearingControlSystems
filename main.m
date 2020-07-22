@@ -1,5 +1,4 @@
 clc; clear;
-clear classes;
 clear all;
 
 g=9.81;
@@ -42,103 +41,23 @@ F2=a*mass*g/(a+b); % static force on bearing#2
 F1=mass*g-F2;      % static force on bearing#1
 delta=25e-6;       % unbalance 4e-6
 force_parameters=[mass];
-%% initial position and velocity - X,Y,Xdot,Ydot
 
-X0 = 0; Y0 = 0;
-Xdot = 0; Ydot = 0;
-
-initial_parameters=[X0, Xdot, Y0, Ydot];
-
+%% dynamics calculation parameters
+T_calc=0.15; % seconds
+% [X0, Y0] = EquilibriumPosition(F2,mesh_parameters,geometry_parameters, operational_parameters);
 %% linearised model
-% Kxx1=K1(1,1); Kyy1=K1(2,2); Kxy1=K1(1,2); Kyx1=K1(2,1);
-% Kxx2=K2(1,1); Kyy2=K2(2,2); Kxy2=K2(1,2); Kyx2=K2(2,1);
-% 
-% Bxx1=B1(1,1); Byy1=B1(2,2); Bxy1=B1(1,2); Byx1=B1(2,1);
-% Bxx2=B2(1,1); Byy2=B2(2,2); Bxy2=B2(1,2); Byx2=B2(2,1);
-%% dynamics calculation
-% timing
-Tcalc=0.15; % second of calculated time
+load('b2full.mat');
+Q=eye(size(linsys1.A)); Q(1,1)=2500; Q(2,2)= 500; Q(3,3)=1000; Q(4,4)= 50;
+R=[0.05 0; 0 0.1]; 
+K=lqr(linsys1.A,linsys1.B,Q,R);
+linsyslqr=ss(linsys1.A-linsys1.B*K,linsys1.B,linsys1.C,linsys1.D);
 
-% initial conditions
-% Fdx=linspace(-100,100,9);
-% Fdy=linspace(-100,100,9);
-Fdx=0;
-Fdy=0;
-% N=length(Fdx)*length(Fdy);
-% count=0;
-% FdC=zeros(2,length(Fdx));
-% for i=1:length(Fdx)
-%     for j=1:length(Fdy)
-%         count=count+1;
-%         FdC(1,count)=Fdx(i);
-%         FdC(2,count)=Fdy(j);
-%     end
-% end
-%     [t, x] = ode45 (@(t, x) EOM(t, x,Fdx,Fdy,F1, mesh_parameters, geometry_parameters, operational_parameters), [0 Tcalc], [X0 Xdot Y0 Ydot]);
-%     X=x(:, 1);
-%     Xdot=x(:, 2);
-%     Y=x(:, 3);
-%     Ydot=x(:, 4);
-% %%
-% iteration=41;
-% 
-% tic
-% parfor iteration = 1:N
-%     message = ['Completing iteration #',num2str(iteration)];
-%     disp(message);
-%     
-%     Xfilename=['C:\Users\Alexander\OneDrive\Documents\XC1', num2str(iteration),'.mat'];
-%     
-%     X=0; Xdot=0; Y=0; Ydot=0;
-%     
-%     FdX=FdC(1,iteration); FdY=FdC(2,iteration);
-%     
-%     tic  
-%     [t, x] = ode45 (@(t, x) EOM(t, x,FdX,FdY,F1, mesh_parameters, geometry_parameters, operational_parameters), [0 Tcalc], [X Xdot Y Ydot]);
-%     X=x(:, 1);
-%     Xdot=x(:, 2);
-%     Y=x(:, 3);
-%     Ydot=x(:, 4);
-%       
-%     %% force calculation
-%     
-%     Fx=zeros(1,length(t));
-%     Fy=zeros(1,length(t));
-%     xc = zeros(4, length(t));
-%     fc= zeros(2, length(t));
-%     
-%     for i=1:length(t)
-%         [FX,FY]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[X(i) Xdot(i) Y(i) Ydot(i)]);
-%         xc(1,i)=X(i); xc(2,i)=Xdot(i); xc(3,i)=Y(i); xc(4,i)=Ydot(i);
-%         fc(1,i)=FX; fc(2,i)=FY;
-%     end
-%     
-%     XC1{iteration}=xc;
-%     FC1{iteration}=fc;
-% 
-%     eltime=toc;
-%     message = ['Complete in ',num2str(eltime),' seconds'];
-%     disp(message);
-% end
-% toc
-%%
-% for i=1:length(T)-1
-%     [FX,FY]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[X Xdot Y Ydot])
-%     
-%     [t, x] = ode45 (@(t, x) EOM(t, x,FX,FY,FdX,FdY,F2), [Tstart Tstop], [X Xdot Y Ydot]);
-%     
-%     X=x(end, 1);
-%     Xdot=x(end, 2);
-%     Y=x(end, 3);
-%     Ydot=x(end, 4);
-% 
-%     Tstart=Tstart+dt;
-%     Tstop=Tstop+dt
-% end
+%% dynamics training set calculation
+% [XC1, FC1] = dynamics(F1, mesh_parameters, geometry_parameters, operational_parameters,T_calc);
 
 %% parameters of CS elements
 % proximity transducer properties
-Vmax=10;  % max and min 
+Vmax=10;  % max and min
 Vmin=0;  % output voltage
 Hmax=6e-3; % max and min
 Hmin=0e-3; % measured distance in the linear range
@@ -146,8 +65,8 @@ Kps=(Vmax-Vmin)/(Hmax-Hmin); %proximity sensor voltage2gap coefficient
 ps=1e-6; % accuracy
 taus=0.00125; %time constant
 
-% band limited white noise 
-n_pow=1e-8; %n_pow=1e-8;
+% band limited white noise
+n_pow=1e-10; %n_pow=1e-8;
 
 % ADC resolution and sampling freq
 fs=1000; % sampling freq in Hz
@@ -155,12 +74,9 @@ Ts=1/fs; % sampling time in sec
 adc_acc=0.0063; % datasheet absolute accuracy in V
 
 % Servovalve characteristics
-Vmax_sv=10; % max and min 
+Vmax_sv=10; % max and min
 Vmin_sv=0; % input voltage
 Ksv = 30; % gain coefficient
 tau = 0.12; % time constant
 svs = 0.1*Vmax_sv; %voltage sensitivity
-
-
-
 
