@@ -43,15 +43,60 @@ delta=25e-6;       % unbalance 4e-6
 force_parameters=[mass];
 
 %% dynamics calculation parameters
-T_calc=0.15; % seconds
-% [X0, Y0] = EquilibriumPosition(F2,mesh_parameters,geometry_parameters, operational_parameters);
+Tcalc=0.15; % seconds
+% equilibrium position explicit determination
+FdX=0;FdY=0;
+[t, x] = ode45 (@(t, x) EOM(t, x,FdX,FdY,F2, mesh_parameters, geometry_parameters, operational_parameters), [0 Tcalc], [0 0 0 0]);
+xeq=x(end,1);
+yeq=x(end,3);
 %% linearised model
-load('b2full.mat');
-Q=eye(size(linsys1.A)); Q(1,1)=2500; Q(2,2)= 500; Q(3,3)=1000; Q(4,4)= 50;
-R=[0.05 0; 0 0.1]; 
-K=lqr(linsys1.A,linsys1.B,Q,R);
-linsyslqr=ss(linsys1.A-linsys1.B*K,linsys1.B,linsys1.C,linsys1.D);
+% load('b2full.mat');
+% Q=eye(size(linsys1.A)); Q(1,1)=2500; Q(2,2)= 500; Q(3,3)=1000; Q(4,4)= 50;
+% R=[0.05 0; 0 0.1]; 
+% K=lqr(linsys1.A,linsys1.B,Q,R);
+% linsyslqr=ss(linsys1.A-linsys1.B*K,linsys1.B,linsys1.C,linsys1.D);
+[FX0,FY0]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0])
+% [K, B] = dyn_coeff(mesh_parameters,geometry_parameters, operational_parameters,omega, xeq, yeq, FX0, FY0)
+% 
+mm=F2/g;
+% Kxx=K(1,1); Kxy=K(1,2); Kyx=K(2,1); Kyy=K(2,2); 
+% Bxx=B(1,1); Bxy=B(1,2); Byx=B(2,1); Byy=B(2,2); 
+delta=1e-6;
+deltav=1e-5;
 
+[FXX1,FYY1]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq+delta 0 yeq 0]);
+[FXX2,FYY2]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq-delta 0 yeq 0]);
+
+Kxx=(FXX1-FXX2)/(2*delta);
+Kyx=(FYY1-FYY2)/(2*delta);
+
+[FXX3,FYY3]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq+delta 0]);
+[FXX4,FYY4]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq-delta 0]);
+
+Kxy=(FXX3-FXX4)/(2*delta);
+Kyy=(FYY3-FYY4)/(2*delta);
+
+[FXX1,FYY1]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0+deltav yeq 0]);
+[FXX2,FYY2]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0-deltav yeq 0]);
+
+Bxx=(FXX1-FXX2)/(2*deltav);
+Byx=(FYY1-FYY2)/(2*deltav);
+
+[FXX3,FYY3]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0+deltav]);
+[FXX4,FYY4]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0-deltav]);
+
+Bxy=(FXX3-FXX4)/(2*deltav);
+Byy=(FYY3-FYY4)/(2*deltav);
+
+A=[0 1 0 0; Kxx/mm Bxx/mm Kxy/mm Bxy/mm; 0 0 0 1; Kyx/mm Byx/mm Kyy/mm Byy/mm];
+
+B=[0 0; 1/mm 0; 0 0; 0 1/mm];
+
+C=eye(size(A));
+
+D=0;
+
+b2lin=ss(A,B,C,D);
 %% dynamics training set calculation
 % [XC1, FC1] = dynamics(F1, mesh_parameters, geometry_parameters, operational_parameters,T_calc);
 
