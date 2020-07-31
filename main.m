@@ -127,7 +127,7 @@ D=0;
 b2lin=ss(A,B,C,D);
 %b2lind=c2d(b2lin,Ts);
 
-Q=eye(size(A))*10;
+Q=[50 0 0 0; 0 5 0 0; 0 0 15 0; 0 0 0 5];
 R=[1 0; 0 1];
 Klqr=lqr(A,B,Q,R);
 b2lin_lqr=ss(A-B*Klqr,B,C,D);
@@ -137,8 +137,8 @@ b2lin_lqr=ss(A-B*Klqr,B,C,D);
 % [y2,t,x] = initial(b2lin_lqr,ic,3);
 
 % Kalman Filter design 
-Vd = 1000*eye(size(A));  % disturbance covariance
-Vn = 0.01*eye(size(A));       % noise covariance
+Vd = 1000*eye(size(A)); % disturbance covariance
+Vn = 1*eye(size(A));      % noise covariance
 
 [Kkf,P,E] = lqe(A,Vd,C,Vd,Vn); 
 
