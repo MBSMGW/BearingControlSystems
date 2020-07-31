@@ -49,13 +49,41 @@ FdX=0;FdY=0;
 [t, x] = ode45 (@(t, x) EOM(t, x,FdX,FdY,F2, mesh_parameters, geometry_parameters, operational_parameters), [0 Tcalc], [0 0 0 0]);
 xeq=x(end,1);
 yeq=x(end,3);
+
+%% dynamics training set calculation
+% [XC1, FC1] = dynamics(F1, mesh_parameters, geometry_parameters, operational_parameters,T_calc);
+
+%% parameters of CS elements
+% proximity transducer properties
+Vmax=10;  % max and min
+Vmin=0;  % output voltage
+Hmax=6e-3; % max and min
+Hmin=0e-3; % measured distance in the linear range
+Kps=(Vmax-Vmin)/(Hmax-Hmin); %proximity sensor voltage2gap coefficient
+ps=1e-6; % accuracy
+taus=0.00125; %time constant
+
+% band limited white noise
+n_pow=1e-10; %n_pow=1e-8;
+
+% ADC resolution and sampling freq
+fs=1000; % sampling freq in Hz
+Ts=1/fs; % sampling time in sec
+adc_acc=0.0063; % datasheet absolute accuracy in V
+
+% Servovalve characteristics
+Vmax_sv=10; % max and min
+Vmin_sv=0; % input voltage
+Ksv = 30; % gain coefficient
+tau = 0.12; % time constant
+svs = 0.1*Vmax_sv; %voltage sensitivity
 %% linearised model
 % load('b2full.mat');
 % Q=eye(size(linsys1.A)); Q(1,1)=2500; Q(2,2)= 500; Q(3,3)=1000; Q(4,4)= 50;
 % R=[0.05 0; 0 0.1]; 
 % K=lqr(linsys1.A,linsys1.B,Q,R);
 % linsyslqr=ss(linsys1.A-linsys1.B*K,linsys1.B,linsys1.C,linsys1.D);
-[FX0,FY0]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0])
+[FX0,FY0]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0]);
 % [K, B] = dyn_coeff(mesh_parameters,geometry_parameters, operational_parameters,omega, xeq, yeq, FX0, FY0)
 % 
 mm=F2/g;
@@ -90,38 +118,29 @@ Byy=(FYY3-FYY4)/(2*deltav);
 
 A=[0 1 0 0; Kxx/mm Bxx/mm Kxy/mm Bxy/mm; 0 0 0 1; Kyx/mm Byx/mm Kyy/mm Byy/mm];
 
-B=[0 0; 1/mm 0; 0 0; 0 1/mm];
+B=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm];
 
-C=eye(size(A));
+C=[1 0 0 0; 0 0 0 0; 0 0 1 0; 0 0 0 0];
 
 D=0;
 
 b2lin=ss(A,B,C,D);
-%% dynamics training set calculation
-% [XC1, FC1] = dynamics(F1, mesh_parameters, geometry_parameters, operational_parameters,T_calc);
+%b2lind=c2d(b2lin,Ts);
 
-%% parameters of CS elements
-% proximity transducer properties
-Vmax=10;  % max and min
-Vmin=0;  % output voltage
-Hmax=6e-3; % max and min
-Hmin=0e-3; % measured distance in the linear range
-Kps=(Vmax-Vmin)/(Hmax-Hmin); %proximity sensor voltage2gap coefficient
-ps=1e-6; % accuracy
-taus=0.00125; %time constant
+Q=eye(size(A))*10;
+R=[1 0; 0 1];
+Klqr=lqr(A,B,Q,R);
+b2lin_lqr=ss(A-B*Klqr,B,C,D);
 
-% band limited white noise
-n_pow=1e-10; %n_pow=1e-8;
+% ic=[-25e-6 0 -25e-6 0];
+% [y1,t,x] = initial(b2lin,ic,3);
+% [y2,t,x] = initial(b2lin_lqr,ic,3);
 
-% ADC resolution and sampling freq
-fs=1000; % sampling freq in Hz
-Ts=1/fs; % sampling time in sec
-adc_acc=0.0063; % datasheet absolute accuracy in V
+% Kalman Filter design 
+Vd = 1000*eye(size(A));  % disturbance covariance
+Vn = 0.01*eye(size(A));       % noise covariance
 
-% Servovalve characteristics
-Vmax_sv=10; % max and min
-Vmin_sv=0; % input voltage
-Ksv = 30; % gain coefficient
-tau = 0.12; % time constant
-svs = 0.1*Vmax_sv; %voltage sensitivity
+[Kkf,P,E] = lqe(A,Vd,C,Vd,Vn); 
 
+syskf = ss(A-Kkf*C,[B Kkf],eye(size(A)),0); 
+syskfd = c2d(syskf,Ts);
