@@ -78,17 +78,11 @@ Ksv = 30; % gain coefficient
 tau = 0.12; % time constant
 svs = 0.1*Vmax_sv; %voltage sensitivity
 %% linearised model
-% load('b2full.mat');
-% Q=eye(size(linsys1.A)); Q(1,1)=2500; Q(2,2)= 500; Q(3,3)=1000; Q(4,4)= 50;
-% R=[0.05 0; 0 0.1]; 
-% K=lqr(linsys1.A,linsys1.B,Q,R);
-% linsyslqr=ss(linsys1.A-linsys1.B*K,linsys1.B,linsys1.C,linsys1.D);
-[FX0,FY0]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0]);
-% [K, B] = dyn_coeff(mesh_parameters,geometry_parameters, operational_parameters,omega, xeq, yeq, FX0, FY0)
-% 
+
+%[FX0,FY0]= CalculateLoadCapacity(mesh_parameters,geometry_parameters, operational_parameters,[xeq 0 yeq 0]);
+
 mm=F2/g;
-% Kxx=K(1,1); Kxy=K(1,2); Kyx=K(2,1); Kyy=K(2,2); 
-% Bxx=B(1,1); Bxy=B(1,2); Byx=B(2,1); Byy=B(2,2); 
+
 delta=1e-6;
 deltav=1e-5;
 
@@ -122,25 +116,27 @@ B=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm];
 
 C=[1 0 0 0; 0 0 0 0; 0 0 1 0; 0 0 0 0];
 
+C1=eye(size(A));
+
 D=0;
 
 b2lin=ss(A,B,C,D);
-%b2lind=c2d(b2lin,Ts);
-
-Q=[50 0 0 0; 0 5 0 0; 0 0 15 0; 0 0 0 5];
-R=[1 0; 0 1];
-Klqr=lqr(A,B,Q,R);
-b2lin_lqr=ss(A-B*Klqr,B,C,D);
-
-% ic=[-25e-6 0 -25e-6 0];
-% [y1,t,x] = initial(b2lin,ic,3);
-% [y2,t,x] = initial(b2lin_lqr,ic,3);
-
-% Kalman Filter design 
-Vd = 1000*eye(size(A)); % disturbance covariance
-Vn = 1*eye(size(A));      % noise covariance
-
-[Kkf,P,E] = lqe(A,Vd,C,Vd,Vn); 
-
-syskf = ss(A-Kkf*C,[B Kkf],eye(size(A)),0); 
+%%
+b2linopt=ss(A,B,C1,D);
+kQR=10;
+% Kalman Filter design
+Vd = [2750 0 0 0; 0 2750 0 0; 0 0 3750 0; 0 0 0 3750]; % disturbance covariance
+Vn = [275 0 0 0; 0 275 0 0; 0 0 375 0; 0 0 0 375];     % noise covariance
+[Kkf] = lqe(A,Vd,C,Vd,Vn);
+syskf = ss(A-Kkf*C,[B Kkf],eye(size(A)),0);
 syskfd = c2d(syskf,Ts);
+
+Aaug=[0 1 0 0 0 0; Kxx/mm Bxx/mm Kxy/mm Bxy/mm 0 0; 0 0 0 1 0 0; Kyx/mm Byx/mm Kyy/mm Byy/mm 0 0; 1 0 0 0 0 0; 0 0 1 0 0 0];
+Baug=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm; 0 0; 0 0];
+Caug=[1 0 0 0 0 0; 0 1 0 0 0 0; 0 0 1 0 0 0; 0 0 0 1 0 0; 0 0 0 0 0 0; 0 0 0 0 0 0];
+Daug=D;
+
+b2linaug=ss(Aaug,Baug,Caug,Daug);
+Qaug=[1500 0 0 0 0 0; 0 10 0 0 0 0; 0 0 1500 0 0 0; 0 0 0 10 0 0; 0 0 0 0 1500 0; 0 0 0 0 0 1500];
+Raug=[10 0; 0 10];
+Klqgi=lqr(Aaug,Baug,Qaug,Raug);
