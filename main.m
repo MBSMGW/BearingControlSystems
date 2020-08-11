@@ -14,6 +14,8 @@ R = D/2;
 L = 0.04;      %bearing length
 h0 = 50e-6;     %radial clearence
 
+nu = 1/h0; % scaling factor
+
 geometry_parameters=[L R h0];
 
 %% operational parameters - RPM, viscosity, load
@@ -116,15 +118,10 @@ B=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm];
 
 C=[1 0 0 0; 0 0 0 0; 0 0 1 0; 0 0 0 0];
 
-C1=eye(size(A));
-
 D=0;
 
 b2lin=ss(A,B,C,D);
-%%
-b2linopt=ss(A,B,C1,D);
-kQR=10;
-% Kalman Filter design
+%% Kalman Filter design
 Vd = [2750 0 0 0; 0 2750 0 0; 0 0 3750 0; 0 0 0 3750]; % disturbance covariance
 Vn = [275 0 0 0; 0 275 0 0; 0 0 375 0; 0 0 0 375];     % noise covariance
 [Kkf] = lqe(A,Vd,C,Vd,Vn);
@@ -140,3 +137,39 @@ b2linaug=ss(Aaug,Baug,Caug,Daug);
 Qaug=[1500 0 0 0 0 0; 0 10 0 0 0 0; 0 0 1500 0 0 0; 0 0 0 10 0 0; 0 0 0 0 1500 0; 0 0 0 0 0 1500];
 Raug=[10 0; 0 10];
 Klqgi=lqr(Aaug,Baug,Qaug,Raug);
+
+%% PID design
+A=[0 1 0 0; Kxx/mm Bxx/mm Kxy/mm Bxy/mm; 0 0 0 1; Kyx/mm Byx/mm Kyy/mm Byy/mm];
+
+B=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm];
+
+C=[1*nu 0 0 0; 0 0 0 0; 0 0 1*nu 0; 0 0 0 0];
+
+D=0;
+
+b2scaled=ss(A,B,C,D);
+
+KPX=1;
+KIX=7;
+KDX=0;
+
+KPY=1;
+KIY=7;
+KDY=0;
+
+K=[KPX KIX KDX; KPY KIY KDY];
+
+cost=@(K)costFun()
+
+% subplot(2,2,1)
+% margin(b2scaled(1,1))
+% legend('PID X -> DISP X')
+% subplot(2,2,2)
+% margin(b2scaled(3,1))
+% legend('PID X -> DISP Y')
+% subplot(2,2,3)
+% margin(b2scaled(1,2))
+% legend('PID Y -> DISP X')
+% subplot(2,2,4)
+% margin(b2scaled(3,2))
+% legend('PID Y -> DISP Y')
