@@ -26,7 +26,7 @@ PresCond=0;     %ambient pressure condition
 
 operational_parameters=[n_rpm, mu, PresCond];
 %% force parameters
-mass=3.793;         %rotor full mass, kg 3.793
+mass=3.793;         %rotor full mass, kg 3.793 (REAL MASS = 3.970 4.4% different)
 
 Jp=0.00075; %polar moment of inertia, kg m^2  3693 0.00075
 Jd=0.047331604; % diametral moment of inertia, kg m^2 0.047331604;
@@ -138,30 +138,9 @@ Qaug=[1500 0 0 0 0 0; 0 10 0 0 0 0; 0 0 1500 0 0 0; 0 0 0 10 0 0; 0 0 0 0 1500 0
 Raug=[10 0; 0 10];
 Klqgi=lqr(Aaug,Baug,Qaug,Raug);
 
-%% PID design
-A=[0 1 0 0; Kxx/mm Bxx/mm Kxy/mm Bxy/mm; 0 0 0 1; Kyx/mm Byx/mm Kyy/mm Byy/mm];
 
-B=[0 0; Ksv/mm 0; 0 0; 0 Ksv/mm];
 
-C=[1*nu 0 0 0; 0 0 0 0; 0 0 1*nu 0; 0 0 0 0];
-
-D=0;
-
-b2scaled=ss(A,B,C,D);
-
-KPX=1;
-KIX=7;
-KDX=0;
-
-KPY=1;
-KIY=7;
-KDY=0;
-
-K=[KPX KIX KDX; KPY KIY KDY];
-
-cost=@(K)costFun()
-
-% subplot(2,2,1)
+%  subplot(2,2,1)
 % margin(b2scaled(1,1))
 % legend('PID X -> DISP X')
 % subplot(2,2,2)
